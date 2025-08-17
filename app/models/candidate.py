@@ -5,8 +5,7 @@ from sqlalchemy import Column, ForeignKey, Integer, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
-# Define the association table for the many-to-many relationship
-# between candidates and groups.
+# Define the association table for the candidates<->groups relationship
 candidates_groups_association = Table(
     "candidates_groups",
     Base.metadata,
@@ -21,15 +20,15 @@ class Candidate(Base):
     candidates_id: Mapped[int] = mapped_column(primary_key=True)
     candidate_name: Mapped[str | None]
 
-    # Many-to-Many relationship with Group
+    # Relationship to Group. `back_populates` points to `candidates` attribute in Group model.
     groups: Mapped[List["Group"]] = relationship(
         secondary=candidates_groups_association, back_populates="candidates"
     )
 
+    # Relationship to Vote. `back_populates` points to `candidates` attribute in Vote model.
+    votes: Mapped[List["Vote"]] = relationship(
+        secondary="vote_candidates", back_populates="candidates"
+    )
+
     def __repr__(self) -> str:
         return f"<Candidate(id={self.candidates_id}, name='{self.candidate_name}')>"
-
-# Add the corresponding relationship to the Group model
-Group.candidates = relationship(
-    "Candidate", secondary=candidates_groups_association, back_populates="groups"
-)

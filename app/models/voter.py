@@ -12,7 +12,7 @@ class Voter(Base):
     voter_phone: Mapped[str | None] = mapped_column(unique=True)
     groups_id: Mapped[int] = mapped_column(ForeignKey("groups.groups_id"))
 
-    # Relationship to Group (Many-to-One: A Voter belongs to one Group)
+    # Relationship to Group. `back_populates` points to the `voters` attribute in the Group model.
     group: Mapped["Group"] = relationship(back_populates="voters")
 
     def __repr__(self) -> str:
