@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models import Vote, Candidate, Voter, VoterVote, Group
 from app.schemas.vote import VoteEventCreate, VoteCast, VoteResult, CandidateResult
-
+from typing import List
 def create_vote_event(db: Session, vote_event: VoteEventCreate) -> Vote:
     """
     Creates a new voting event and associates candidates with it.
@@ -170,3 +170,29 @@ def combine_vote_results(db: Session, vote_ids: list[int], group_id: int | None 
         total_votes=total_votes,
         breakdown=breakdown,
     )
+
+
+
+def get_candidates_for_vote(db: Session, vote_id: int) -> List[Candidate]:
+    """
+    Retrieves a list of all candidates participating in a specific vote event.
+
+    Args:
+        db: The SQLAlchemy database session.
+        vote_id: The ID of the vote event.
+
+    Returns:
+        A list of Candidate SQLAlchemy model instances.
+    
+    Raises:
+        ValueError: If the vote event with the given ID is not found.
+    """
+    # Use session.get for a simple primary key lookup
+    vote_event = db.get(Vote, vote_id)
+
+    if not vote_event:
+        raise ValueError("Vote event not found.")
+
+    # Thanks to SQLAlchemy relationships, the candidates are already linked.
+    # We can just return them directly.
+    return vote_event.candidates

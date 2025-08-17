@@ -2,12 +2,13 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
+from typing import List
 from app.db.session import get_db
 from app.schemas.vote import (
-    VoteEventCreate, VoteEventRead, VoteCast, VoteCastRead, VoteResult, VoteCombineRequest
+    VoteEventCreate, VoteEventRead, VoteCast, VoteCastRead, VoteResult, VoteCombineRequest,
 )
 from app.services import vote_service
+from app.schemas.candidate import CandidateRead
 
 router = APIRouter()
 
@@ -97,3 +98,20 @@ def get_combined_results(
     except ValueError as e:
         # This will catch validation errors like mismatched candidates
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
+@router.get("/{vote_id}/candidates/", response_model=List[CandidateRead])
+def get_candidates_in_event(
+    *,
+    db: Session = Depends(get_db),
+    vote_id: int
+):
+    """
+    Get a list of all candidates participating in a specific vote event.
+    """
+    try:
+        candidates = vote_service.get_candidates_for_vote(db=db, vote_id=vote_id)
+        return candidates
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
