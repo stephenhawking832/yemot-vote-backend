@@ -5,6 +5,29 @@ import io
 from typing import List
 from sqlalchemy.orm import Session
 from app.models.voter import Voter
+from app.schemas.voter import VoterCreate
+
+def create_voter(db: Session, voter: VoterCreate) -> Voter:
+    """
+    Creates a single new voter in the database.
+
+    Args:
+        db: The SQLAlchemy database session.
+        voter: The Pydantic schema containing the voter's data.
+
+    Returns:
+        The newly created Voter SQLAlchemy model instance.
+    """
+    # Create a SQLAlchemy Voter model instance from the schema data
+    db_voter = Voter(
+        voter_name=voter.voter_name,
+        voter_phone=voter.voter_phone,
+        groups_id=voter.groups_id
+    )
+    db.add(db_voter)
+    db.commit()
+    db.refresh(db_voter)
+    return db_voter
 
 def bulk_create_voters_from_csv(db: Session, csv_file: io.BytesIO) -> int:
     """
