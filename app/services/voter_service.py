@@ -19,7 +19,7 @@ def bulk_create_voters_from_csv(db: Session, csv_file: io.BytesIO) -> int:
         The number of voters successfully created.
     """
     # Decode the byte stream into a text stream
-    stream = io.StringIO(csv_file.decode("utf-8"))
+    stream = io.TextIOWrapper(csv_file, encoding="utf-8")
     
     # Use the csv module to read the data
     reader = csv.reader(stream)
