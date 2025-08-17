@@ -20,15 +20,18 @@ class Candidate(Base):
     candidates_id: Mapped[int] = mapped_column(primary_key=True)
     candidate_name: Mapped[str | None]
 
-    # Relationship to Group. `back_populates` points to `candidates` attribute in Group model.
-    groups: Mapped[List["Group"]] = relationship(
-        secondary=candidates_groups_association, back_populates="candidates"
-    )
+    # ADD the new foreign key column to groups
+    groups_id: Mapped[int] = mapped_column(ForeignKey("groups.groups_id"))
 
-    # Relationship to Vote. `back_populates` points to `candidates` attribute in Vote model.
+    # CHANGE the relationship from a List["Group"] to a single "Group"
+    # This defines the "many-to-one" side of the relationship.
+    group: Mapped["Group"] = relationship(back_populates="candidates")
+
+    # The relationship to Vote remains the same
     votes: Mapped[List["Vote"]] = relationship(
         secondary="vote_candidates", back_populates="candidates"
     )
 
     def __repr__(self) -> str:
-        return f"<Candidate(id={self.candidates_id}, name='{self.candidate_name}')>"
+        # Update the repr to be more useful
+        return f"<Candidate(id={self.candidates_id}, name='{self.candidate_name}', group_id={self.groups_id})>"

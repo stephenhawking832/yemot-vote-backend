@@ -24,7 +24,7 @@ def upload_voters_csv(
 
     try:
         # The service expects a file-like object with bytes
-        created_count = voter_service.bulk_create_voters_from_csv(db=db, csv_file=csv_file.file.read())
+        created_count = voter_service.bulk_create_voters_from_csv(db=db, csv_file=csv_file.file)
         return {"message": f"Successfully created {created_count} voters."}
     except IntegrityError as e:
         # This can happen if a group_id doesn't exist or a phone number is duplicated
