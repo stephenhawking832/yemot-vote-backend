@@ -2,8 +2,9 @@
 
 import datetime
 from sqlalchemy.orm import Session
-from app.models import Vote, Candidate, Voter, VoterVote
-from app.schemas.vote import VoteEventCreate, VoteCast
+from sqlalchemy import func
+from app.models import Vote, Candidate, Voter, VoterVote, Group
+from app.schemas.vote import VoteEventCreate, VoteCast, VoteResult, CandidateResult
 
 def create_vote_event(db: Session, vote_event: VoteEventCreate) -> Vote:
     """
@@ -57,3 +58,115 @@ def cast_vote(db: Session, vote_id: int, vote_cast: VoteCast) -> VoterVote:
     db.refresh(db_voter_vote)
     
     return db_voter_vote
+
+
+
+def get_vote_results(db: Session, vote_id: int, group_id: int | None = None) -> VoteResult:
+    """
+    Calculates the results for a single vote event, with an optional filter by group.
+    """
+    # 1. Fetch the vote event to get its title
+    vote_event = db.get(Vote, vote_id)
+    if not vote_event:
+        raise ValueError("Vote event not found.")
+
+    # 2. Build the base query for counting votes
+    query = (
+        db.query(
+            Candidate.candidates_id,
+            Candidate.candidate_name,
+            func.count(VoterVote.voters_votes_id).label("vote_count"),
+        )
+        .join(VoterVote, VoterVote.candidates_id == Candidate.candidates_id)
+        .filter(VoterVote.votes_id == vote_id)
+    )
+
+    # 3. If a group_id is provided, add a filter for it
+    if group_id:
+        query = query.join(Voter, Voter.voters_id == VoterVote.voters_id).filter(
+            Voter.groups_id == group_id
+        )
+
+    # 4. Group by candidate and order the results
+    results = (
+        query.group_by(Candidate.candidates_id, Candidate.candidate_name)
+        .order_by(func.count(VoterVote.voters_votes_id).desc())
+        .all()
+    )
+
+    # 5. Structure the results using our Pydantic schemas
+    breakdown = [
+        CandidateResult(
+            candidate_id=cid, candidate_name=cname, vote_count=count
+        )
+        for cid, cname, count in results
+    ]
+    total_votes = sum(item.vote_count for item in breakdown)
+
+    return VoteResult(
+        vote_id=vote_id,
+        vote_title=vote_event.vote_title,
+        total_votes=total_votes,
+        breakdown=breakdown,
+    )
+
+
+def combine_vote_results(db: Session, vote_ids: list[int], group_id: int | None = None) -> VoteResult:
+    """
+    Calculates the combined results for a list of vote events, with an optional filter by group.
+    Validates that all events share the exact same set of candidates.
+    """
+    if not vote_ids or len(vote_ids) < 2:
+        raise ValueError("At least two vote IDs are required to combine results.")
+
+    # 1. Validate that all vote events have the same candidates
+    votes = db.query(Vote).filter(Vote.votes_id.in_(vote_ids)).all()
+    if len(votes) != len(vote_ids):
+        raise ValueError("One or more vote IDs are invalid.")
+    
+    first_candidate_set = {c.candidates_id for c in votes[0].candidates}
+    for vote in votes[1:]:
+        candidate_set = {c.candidates_id for c in vote.candidates}
+        if first_candidate_set != candidate_set:
+            raise ValueError(
+                f"Cannot combine events. Vote ID {vote.votes_id} has a different set of candidates."
+            )
+
+    # 2. The query is very similar to get_vote_results, but filters for multiple IDs
+    query = (
+        db.query(
+            Candidate.candidates_id,
+            Candidate.candidate_name,
+            func.count(VoterVote.voters_votes_id).label("vote_count"),
+        )
+        .join(VoterVote, VoterVote.candidates_id == Candidate.candidates_id)
+        .filter(VoterVote.votes_id.in_(vote_ids)) # Key difference is here
+    )
+
+    if group_id:
+        query = query.join(Voter, Voter.voters_id == VoterVote.voters_id).filter(
+            Voter.groups_id == group_id
+        )
+
+    results = (
+        query.group_by(Candidate.candidates_id, Candidate.candidate_name)
+        .order_by(func.count(VoterVote.voters_votes_id).desc())
+        .all()
+    )
+    
+    # 3. Structure the results
+    breakdown = [
+        CandidateResult(
+            candidate_id=cid, candidate_name=cname, vote_count=count
+        )
+        for cid, cname, count in results
+    ]
+    total_votes = sum(item.vote_count for item in breakdown)
+    
+    combined_title = "Combined Results: " + " & ".join([v.vote_title for v in votes])
+
+    return VoteResult(
+        vote_title=combined_title,
+        total_votes=total_votes,
+        breakdown=breakdown,
+    )

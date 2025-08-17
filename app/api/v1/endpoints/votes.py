@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.vote import VoteEventCreate, VoteEventRead, VoteCast, VoteCastRead
+from app.schemas.vote import (
+    VoteEventCreate, VoteEventRead, VoteCast, VoteCastRead, VoteResult, VoteCombineRequest
+)
 from app.services import vote_service
 
 router = APIRouter()
@@ -40,4 +42,58 @@ def cast_new_vote(
         return vote_record
     except ValueError as e:
         # This handles "Voter not found" or "already voted" errors
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
+@router.get("/{vote_id}/results/", response_model=VoteResult)
+def get_results_for_event(
+    *,
+    db: Session = Depends(get_db),
+    vote_id: int,
+):
+    """
+    Get the tallied results for a single voting event.
+    """
+    try:
+        return vote_service.get_vote_results(db=db, vote_id=vote_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{vote_id}/results/by-group/{group_id}/", response_model=VoteResult)
+def get_results_for_event_by_group(
+    *,
+    db: Session = Depends(get_db),
+    vote_id: int,
+    group_id: int
+):
+    """
+    Get the tallied results for a single voting event, filtered by a specific group.
+    """
+    try:
+        # We reuse the same service function
+        return vote_service.get_vote_results(db=db, vote_id=vote_id, group_id=group_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/results/combine/", response_model=VoteResult)
+def get_combined_results(
+    *,
+    db: Session = Depends(get_db),
+    payload: VoteCombineRequest,
+    group_id: int | None = None # Optional query parameter
+):
+    """
+    Combine the results of multiple vote events.
+    - All vote events must share the exact same candidates.
+    - Optionally filter the combined results by a group_id.
+    """
+    try:
+        return vote_service.combine_vote_results(
+            db=db, vote_ids=payload.vote_ids, group_id=group_id
+        )
+    except ValueError as e:
+        # This will catch validation errors like mismatched candidates
         raise HTTPException(status_code=400, detail=str(e))

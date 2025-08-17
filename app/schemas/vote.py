@@ -26,3 +26,24 @@ class VoteCastRead(BaseModel):
     candidates_id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+
+class CandidateResult(BaseModel):
+    """Represents the results for a single candidate."""
+    candidate_id: int
+    candidate_name: str
+    vote_count: int
+
+class VoteResult(BaseModel):
+    """Represents the complete results for a voting event."""
+    vote_id: int | None = None
+    vote_title: str
+    total_votes: int
+    breakdown: list[CandidateResult]
+
+# --- Schemas for COMBINING VOTES ---
+
+class VoteCombineRequest(BaseModel):
+    """Schema for the request body to combine votes."""
+    vote_ids: list[int]
